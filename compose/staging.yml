@@ -1,0 +1,81 @@
+version: '3.8'
+
+# Staging environment overrides
+services:
+  # Enable debugging for Laravel services
+  laravel-auth:
+    environment:
+      - APP_ENV=staging
+      - APP_DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./logs/laravel-auth:/var/www/html/storage/logs
+
+  laravel-catalog:
+    environment:
+      - APP_ENV=staging
+      - APP_DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./logs/laravel-catalog:/var/www/html/storage/logs
+
+  # Enable development mode for Express API
+  express-api:
+    environment:
+      - NODE_ENV=staging
+      - LOG_LEVEL=debug
+    volumes:
+      - ./logs/express-api:/app/logs
+
+  # Development build for frontend
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: ./docker/Dockerfile
+      args:
+        - NODE_ENV=development
+        - VITE_API_URL=http://156.67.24.197
+        - VITE_AUTH_URL=http://156.67.24.197/auth
+        - VITE_CATALOG_URL=http://156.67.24.197/catalog
+    environment:
+      - NODE_ENV=development
+    command: npm run dev -- --host 0.0.0.0 --port 3000
+
+  # Add development tools
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # PHPMyAdmin for database management
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      UPLOAD_LIMIT: 100M
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - microservices
+    restart: unless-stopped

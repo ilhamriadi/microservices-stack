@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    build:
+      context: ./shared/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - laravel-auth
+      - laravel-catalog
+      - express-api
+      - frontend
+    volumes:
+      - ./shared/nginx/logs:/var/log/nginx
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # Laravel Auth Service
+  laravel-auth:
+    build:
+      context: ./services/laravel-auth
+      dockerfile: ./docker/Dockerfile
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DB_HOST=mysql
+      - DB_DATABASE=laravel_auth
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - REDIS_HOST=redis
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - ./services/laravel-auth/src:/var/www/html
+      - ./shared/storage/auth:/var/www/html/storage/app
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # Laravel Catalog Service
+  laravel-catalog:
+    build:
+      context: ./services/laravel-catalog
+      dockerfile: ./docker/Dockerfile
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DB_HOST=mysql
+      - DB_DATABASE=laravel_catalog
+      - DB_USERNAME=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - REDIS_HOST=redis
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - ./services/laravel-catalog/src:/var/www/html
+      - ./shared/storage/catalog:/var/www/html/storage/app
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # Express API Service
+  express-api:
+    build:
+      context: ./services/express-api
+      dockerfile: ./docker/Dockerfile
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - DB_HOST=mysql
+      - DB_DATABASE=express_api
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - REDIS_HOST=redis
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - ./services/express-api/src:/app
+      - ./shared/storage/express:/app/uploads
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: ./docker/Dockerfile
+      args:
+        - VITE_API_URL=http://156.67.24.197
+        - VITE_AUTH_URL=http://156.67.24.197/auth
+        - VITE_CATALOG_URL=http://156.67.24.197/catalog
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./shared/database/data:/var/lib/mysql
+      - ./shared/database/my.cnf:/etc/mysql/conf.d/custom.cnf
+      - ./shared/database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - microservices
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  microservices:
+    driver: bridge
