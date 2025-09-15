@@ -64,12 +64,10 @@ set_permissions() {
 generate_app_keys() {
     echo -e "${YELLOW}🔑 Generating application keys...${NC}"
     
-    # Generate Laravel app keys if not exists
     for service in "laravel-auth" "laravel-catalog"; do
         env_file="services/${service}/.env"
         if [[ -f "$env_file" ]] && ! grep -q "APP_KEY=base64:" "$env_file"; then
             echo "Generating app key for $service..."
-            # Generate a random 32 character key
             app_key=$(openssl rand -base64 32)
             sed -i "s/APP_KEY=.*/APP_KEY=base64:${app_key}/" "$env_file"
         fi
@@ -82,7 +80,7 @@ generate_app_keys() {
 build_images() {
     echo -e "${YELLOW}🏗️ Building Docker images...${NC}"
     
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" build --no-cache
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" build --no-cache
     
     echo -e "${GREEN}✅ Images built successfully${NC}"
 }
@@ -91,24 +89,20 @@ build_images() {
 start_services() {
     echo -e "${YELLOW}🎯 Starting services...${NC}"
     
-    # Start database and Redis first
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d mysql redis
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d mysql redis
     
     echo "Waiting for database to be ready..."
     sleep 30
     
-    # Start application services
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d laravel-auth laravel-catalog express-api
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d laravel-auth laravel-catalog express-api
     
     echo "Waiting for application services to be ready..."
     sleep 20
     
-    # Start frontend and nginx
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d frontend nginx
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d frontend nginx
     
-    # Start additional services for production
     if [[ "$ENVIRONMENT" == "production" ]]; then
-        docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d fluentd backup
+        docker compose -f docker-compose.yml -f "$COMPOSE_FILE" up -d fluentd backup
     fi
     
     echo -e "${GREEN}✅ All services started${NC}"
@@ -118,20 +112,17 @@ start_services() {
 post_deploy() {
     echo -e "${YELLOW}🔧 Running post-deployment tasks...${NC}"
     
-    # Wait for services to be fully ready
     sleep 30
     
-    # Run Laravel migrations and optimizations
     echo "Running Laravel Auth migrations..."
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-auth php artisan migrate --force
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-auth php artisan migrate --force
     
     echo "Running Laravel Catalog migrations..."
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-catalog php artisan migrate --force
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-catalog php artisan migrate --force
     
-    # Optimize Laravel applications
     echo "Optimizing Laravel applications..."
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-auth php artisan optimize
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-catalog php artisan optimize
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-auth php artisan optimize
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" exec -T laravel-catalog php artisan optimize
     
     echo -e "${GREEN}✅ Post-deployment tasks completed${NC}"
 }
@@ -139,7 +130,7 @@ post_deploy() {
 # Function to show service status
 show_status() {
     echo -e "${YELLOW}📊 Service Status:${NC}"
-    docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" ps
+    docker compose -f docker-compose.yml -f "$COMPOSE_FILE" ps
     
     echo -e "\n${YELLOW}🌐 Service URLs:${NC}"
     echo -e "Main Application: ${GREEN}http://156.67.24.197${NC}"
@@ -158,17 +149,15 @@ show_status() {
 health_check() {
     echo -e "${YELLOW}🏥 Running health checks...${NC}"
     
-    # Check nginx
     if curl -f -s http://156.67.24.197/health >/dev/null; then
         echo -e "${GREEN}✅ Nginx is healthy${NC}"
     else
         echo -e "${RED}❌ Nginx health check failed${NC}"
     fi
     
-    # Check services
     services=("laravel-auth" "laravel-catalog" "express-api" "frontend")
     for service in "${services[@]}"; do
-        if docker-compose -f docker-compose.yml -f "$COMPOSE_FILE" ps "$service" | grep -q "Up"; then
+        if docker compose -f docker-compose.yml -f "$COMPOSE_FILE" ps "$service" | grep -q "Up"; then
             echo -e "${GREEN}✅ $service is running${NC}"
         else
             echo -e "${RED}❌ $service is not running${NC}"
@@ -194,9 +183,8 @@ main() {
     
     echo ""
     echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
-    echo -e "${YELLOW}📝 Check logs with: docker-compose -f docker-compose.yml -f $COMPOSE_FILE logs -f${NC}"
-    echo -e "${YELLOW}🛑 Stop services with: docker-compose -f docker-compose.yml -f $COMPOSE_FILE down${NC}"
+    echo -e "${YELLOW}📝 Check logs with: docker compose -f docker-compose.yml -f $COMPOSE_FILE logs -f${NC}"
+    echo -e "${YELLOW}🛑 Stop services with: docker compose -f docker-compose.yml -f $COMPOSE_FILE down${NC}"
 }
 
-# Run main function
 main "$@"
